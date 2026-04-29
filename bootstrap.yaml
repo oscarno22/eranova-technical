@@ -79,6 +79,7 @@ Resources:
                   - apigateway:PATCH
                   - apigateway:GET
                   - apigateway:DELETE
+                  - apigateway:TagResource
                 Resource: '*'
               - Effect: Allow
                 Action:
