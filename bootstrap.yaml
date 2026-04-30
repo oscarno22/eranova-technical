@@ -83,6 +83,12 @@ Resources:
                 Resource: '*'
               - Effect: Allow
                 Action:
+                  - lambda:PublishLayerVersion
+                  - lambda:DeleteLayerVersion
+                  - lambda:GetLayerVersion
+                Resource: !Sub arn:aws:lambda:*:${AWS::AccountId}:layer:eranova-technical-*
+              - Effect: Allow
+                Action:
                   - lambda:AddPermission
                   - lambda:RemovePermission
                 Resource: !Sub arn:aws:lambda:*:${AWS::AccountId}:function:eranova-technical
