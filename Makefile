@@ -7,7 +7,7 @@ layer:
 	uv export --no-dev --no-hashes -o layer/requirements.txt
 	uv pip install \
 		-r layer/requirements.txt \
-		-t layer/python \
+		--target layer/python \
 		--python-version 3.12
 
 bootstrap:
