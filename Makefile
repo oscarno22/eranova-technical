@@ -16,9 +16,3 @@ bootstrap:
 		--stack-name $(BOOTSTRAP_STACK) \
 		--capabilities CAPABILITY_NAMED_IAM \
 		--region $(AWS_REGION)
-
-delete-secret:
-	aws secretsmanager delete-secret \
-		--secret-id eranova/openai-api-key \
-		--force-delete-without-recovery \
-		--region $(AWS_REGION)
