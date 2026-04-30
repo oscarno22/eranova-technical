@@ -3,3 +3,6 @@ __pycache__/
 *.pyo
 .env
 packaged-template.yaml
+.venv/
+layer/python/
+layer/requirements.txt

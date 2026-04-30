@@ -24,12 +24,15 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Build Lambda layer
         run: |
-          pip install \
+          uv export --no-dev --no-hashes -o layer/requirements.txt
+          uv pip install \
             -r layer/requirements.txt \
-            -t layer/python \
-            --upgrade
+            -t layer/python
 
       - name: Package CloudFormation template
         run: |
