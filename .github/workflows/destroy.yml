@@ -1,0 +1,46 @@
+name: Destroy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Empty S3 buckets
+        run: |
+          for KEY in DataBucketName WebsiteBucketName; do
+            BUCKET=$(aws cloudformation describe-stacks \
+              --stack-name eranova-technical \
+              --query "Stacks[0].Outputs[?OutputKey=='$KEY'].OutputValue" \
+              --output text 2>/dev/null || true)
+            if [ -n "$BUCKET" ] && [ "$BUCKET" != "None" ]; then
+              echo "Emptying $BUCKET..."
+              aws s3 rm s3://$BUCKET --recursive
+            fi
+          done
+
+      - name: Force-delete Secrets Manager secret
+        run: |
+          aws secretsmanager delete-secret \
+            --secret-id eranova/openai-api-key \
+            --force-delete-without-recovery 2>/dev/null || true
+
+      - name: Delete CloudFormation stack
+        run: |
+          aws cloudformation delete-stack --stack-name eranova-technical
+          aws cloudformation wait stack-delete-complete --stack-name eranova-technical
+          echo "Stack deleted."

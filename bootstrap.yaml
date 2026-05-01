@@ -49,6 +49,7 @@ Resources:
                 Action:
                   - cloudformation:CreateStack
                   - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
                   - cloudformation:DescribeStacks
                   - cloudformation:DescribeStackEvents
                   - cloudformation:GetTemplateSummary
@@ -123,7 +124,7 @@ Resources:
                   - s3:PutObject
                   - s3:DeleteObject
                   - s3:GetObject
-                Resource: !Sub arn:aws:s3:::eranova-technical-${AWS::AccountId}-website/*
+                Resource: !Sub arn:aws:s3:::eranova-technical-${AWS::AccountId}-*/*
               - Effect: Allow
                 Action:
                   - iam:CreateRole
