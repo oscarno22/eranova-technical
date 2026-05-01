@@ -129,6 +129,17 @@ Resources:
                 Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/eranova-*
               - Effect: Allow
                 Action:
+                  - sns:CreateTopic
+                  - sns:DeleteTopic
+                  - sns:GetTopicAttributes
+                  - sns:SetTopicAttributes
+                  - sns:TagResource
+                  - sns:Subscribe
+                  - sns:Unsubscribe
+                  - sns:ListSubscriptionsByTopic
+                Resource: !Sub arn:aws:sns:*:${AWS::AccountId}:eranova-technical-*
+              - Effect: Allow
+                Action:
                   - secretsmanager:CreateSecret
                   - secretsmanager:PutSecretValue
                   - secretsmanager:GetSecretValue
