@@ -37,33 +37,31 @@ def _extract(file_bytes: bytes, content_type: str) -> ExtractedInvoice:
         b64 = base64.b64encode(file_bytes).decode()
         user_content = [
             {
-                "type": "image_url",
-                "image_url": {"url": f"data:{content_type};base64,{b64}"},
+                "type": "input_image",
+                "image_url": f"data:{content_type};base64,{b64}",
             }
         ]
     elif content_type == "application/pdf":
-        # image_url doesn't accept pdfs — upload via files api
+        # responses api handles pdfs natively via file_id
         uploaded = client.files.create(
             file=("invoice.pdf", io.BytesIO(file_bytes), "application/pdf"),
             purpose="user_data",
         )
         file_id = uploaded.id
-        user_content = [{"type": "file", "file": {"file_id": file_id}}]
+        user_content = [{"type": "input_file", "file_id": file_id}]
     else:
         user_content = [
-            {"type": "text", "text": file_bytes.decode("utf-8", errors="replace")}
+            {"type": "input_text", "text": file_bytes.decode("utf-8", errors="replace")}
         ]
 
     try:
-        response = client.beta.chat.completions.parse(
+        response = client.responses.parse(
             model="gpt-5",
-            messages=[
-                {"role": "system", "content": _EXTRACT_SYSTEM},
-                {"role": "user", "content": user_content},
-            ],
-            response_format=ExtractedInvoice,
+            instructions=_EXTRACT_SYSTEM,
+            input=user_content,
+            text_format=ExtractedInvoice,
         )
-        return response.choices[0].message.parsed
+        return response.output_parsed
     finally:
         if file_id:
             client.files.delete(file_id)
