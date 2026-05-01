@@ -30,7 +30,6 @@ class ClassifiedLineItem(LineItem):
     tax_amount: Decimal
 
 
-# float-typed variant used as the tool function parameter — Decimal generates non-standard schemas
 class ClassifiedLineItemInput(LineItem):
     tax_category: str
     tax_rate: float
