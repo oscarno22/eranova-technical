@@ -1,8 +1,8 @@
 import base64
-import json
 import os
 from typing import List
 
+from agents import Agent, Runner, function_tool
 from openai import OpenAI
 
 import tools as invoice_tools
@@ -22,73 +22,11 @@ compute tax amounts (tax_amount = subtotal * tax_rate),
 then call save_invoice_result with the complete result.
 """
 
-_TOOLS: List[dict] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_tax_categories",
-            "description": "Fetch all available tax categories and their rates from the database.",  # noqa: E501
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "save_invoice_result",
-            "description": "Save the fully classified invoice result. Call once every line item is classified.",  # noqa: E501
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "invoice_id": {"type": "string"},
-                    "line_items": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "description": {"type": "string"},
-                                "quantity": {"type": "number"},
-                                "unit_price": {"type": "number"},
-                                "subtotal": {"type": "number"},
-                                "tax_category": {"type": "string"},
-                                "tax_rate": {"type": "number"},
-                                "tax_amount": {"type": "number"},
-                            },
-                            "required": [
-                                "description",
-                                "quantity",
-                                "unit_price",
-                                "subtotal",
-                                "tax_category",
-                                "tax_rate",
-                                "tax_amount",
-                            ],
-                        },
-                    },
-                    "subtotal": {"type": "number"},
-                    "total_tax": {"type": "number"},
-                    "total": {"type": "number"},
-                },
-                "required": [
-                    "invoice_id",
-                    "line_items",
-                    "subtotal",
-                    "total_tax",
-                    "total",
-                ],
-            },
-        },
-    },
-]
 
-
-def _dispatch(tool_name: str, args: dict, invoice_id: str) -> str:
-    if tool_name == "get_tax_categories":
-        return json.dumps(invoice_tools.get_tax_categories())
-    if tool_name == "save_invoice_result":
-        # always enforce the correct invoice id regardless of what model passes
-        args["invoice_id"] = invoice_id
-        return json.dumps(invoice_tools.save_invoice_result(**args))
-    return json.dumps({"error": f"unknown tool: {tool_name}"})
+@function_tool
+def get_tax_categories() -> List[dict]:
+    """Fetch all available tax categories and their rates from the database."""
+    return invoice_tools.get_tax_categories()
 
 
 def _extract(file_bytes: bytes, content_type: str) -> ExtractedInvoice:
@@ -121,39 +59,30 @@ def _extract(file_bytes: bytes, content_type: str) -> ExtractedInvoice:
 def run(invoice_id: str, file_bytes: bytes, content_type: str) -> None:
     extracted = _extract(file_bytes, content_type)
 
-    messages = [
-        {"role": "system", "content": _CLASSIFY_SYSTEM},
-        {
-            "role": "user",
-            "content": (
-                f"Invoice ID: {invoice_id}\n\n"
-                f"Extracted line items:\n{extracted.model_dump_json(indent=2)}"
-            ),
-        },
-    ]
-
-    while True:
-        response = client.chat.completions.create(
-            model="gpt-5",
-            messages=messages,
-            tools=_TOOLS,
-            tool_choice="auto",
+    @function_tool
+    def save_invoice_result(
+        line_items: List[dict],
+        subtotal: float,
+        total_tax: float,
+        total: float,
+    ) -> dict:
+        """Save the fully classified invoice result. Call once every line item is classified."""  # noqa: E501
+        return invoice_tools.save_invoice_result(
+            invoice_id=invoice_id,
+            line_items=line_items,
+            subtotal=subtotal,
+            total_tax=total_tax,
+            total=total,
         )
 
-        choice = response.choices[0]
+    agent = Agent(
+        name="tax-classifier",
+        model="gpt-5",
+        instructions=_CLASSIFY_SYSTEM,
+        tools=[get_tax_categories, save_invoice_result],
+    )
 
-        if choice.finish_reason == "stop":
-            break
-
-        messages.append(choice.message.model_dump(exclude_none=True))
-
-        for tool_call in choice.message.tool_calls or []:
-            args = json.loads(tool_call.function.arguments)
-            result = _dispatch(tool_call.function.name, args, invoice_id)
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": result,
-                }
-            )
+    Runner.run_sync(
+        agent,
+        f"Invoice ID: {invoice_id}\n\nExtracted line items:\n{extracted.model_dump_json(indent=2)}",  # noqa: E501
+    )

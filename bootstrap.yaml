@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+tAWSTemplateFormatVersion: '2010-09-09'
 Description: Eranova Technical - Bootstrap (run once to set up deployment infrastructure)
 
 Parameters:
