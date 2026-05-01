@@ -58,7 +58,7 @@ def _extract(file_bytes: bytes, content_type: str) -> ExtractedInvoice:
         response = client.responses.parse(
             model="gpt-5",
             instructions=_EXTRACT_SYSTEM,
-            input=user_content,
+            input=[{"role": "user", "content": user_content}],
             text_format=ExtractedInvoice,
         )
         return response.output_parsed
