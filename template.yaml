@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Eranova Technical - Lambda Function
+Description: Eranova Technical - Invoice Tax Classification Service
 
 Parameters:
   OpenAIApiKey:
@@ -37,8 +37,10 @@ Resources:
                   - s3:DeleteObject
                   - s3:ListBucket
                 Resource:
-                  - !GetAtt DataBucket.Arn
-                  - !Sub ${DataBucket.Arn}/*
+                  # use Sub rather than !GetAtt DataBucket.Arn to avoid a circular dependency
+                  # (DataBucket DependsOn LambdaS3Permission -> ProcessLambda -> LambdaExecutionRole)
+                  - !Sub arn:aws:s3:::eranova-technical-${AWS::AccountId}-${AWS::Region}
+                  - !Sub arn:aws:s3:::eranova-technical-${AWS::AccountId}-${AWS::Region}/*
               - Effect: Allow
                 Action:
                   - dynamodb:GetItem
@@ -73,9 +75,37 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
+          TABLE_NAME: !Ref DataTable
+          BUCKET_NAME: !Sub eranova-technical-${AWS::AccountId}-${AWS::Region}
           OPENAI_API_KEY: !Sub '{{resolve:secretsmanager:${OpenAIApiKeySecret}:SecretString:OPENAI_API_KEY}}'
       Layers:
         - !Ref DependenciesLayer
+
+  ProcessLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: eranova-technical-process
+      Runtime: python3.12
+      Handler: process.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code: src/
+      Timeout: 120
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref DataTable
+          BUCKET_NAME: !Sub eranova-technical-${AWS::AccountId}-${AWS::Region}
+          OPENAI_API_KEY: !Sub '{{resolve:secretsmanager:${OpenAIApiKeySecret}:SecretString:OPENAI_API_KEY}}'
+      Layers:
+        - !Ref DependenciesLayer
+
+  LambdaS3Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt ProcessLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub arn:aws:s3:::eranova-technical-${AWS::AccountId}-${AWS::Region}
 
   HttpApi:
     Type: AWS::ApiGatewayV2::Api
@@ -98,11 +128,25 @@ Resources:
       RouteKey: GET /health
       Target: !Sub integrations/${HttpApiIntegration}
 
-  FactRoute:
+  PostInvoiceRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref HttpApi
-      RouteKey: GET /fact
+      RouteKey: POST /invoice
+      Target: !Sub integrations/${HttpApiIntegration}
+
+  GetInvoiceRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /invoice/{id}
+      Target: !Sub integrations/${HttpApiIntegration}
+
+  PostTaxCategoriesRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /tax-categories
       Target: !Sub integrations/${HttpApiIntegration}
 
   HttpApiStage:
@@ -114,6 +158,7 @@ Resources:
 
   DataBucket:
     Type: AWS::S3::Bucket
+    DependsOn: LambdaS3Permission
     Properties:
       BucketName: !Sub eranova-technical-${AWS::AccountId}-${AWS::Region}
       PublicAccessBlockConfiguration:
@@ -121,6 +166,15 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: uploads/
+            Function: !GetAtt ProcessLambda.Arn
 
   DataTable:
     Type: AWS::DynamoDB::Table
@@ -147,12 +201,8 @@ Resources:
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*
 
 Outputs:
-  LambdaFunctionName:
-    Value: !Ref LambdaFunction
-  LambdaFunctionArn:
-    Value: !GetAtt LambdaFunction.Arn
   ApiEndpoint:
-    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/health
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
   DataBucketName:
     Value: !Ref DataBucket
   DataTableName:
