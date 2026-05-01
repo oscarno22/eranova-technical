@@ -6,13 +6,12 @@ from datetime import datetime, timezone
 import boto3
 from botocore.config import Config
 
-TABLE_NAME = os.environ["TABLE_NAME"]
+from repository import repo
+
 BUCKET_NAME = os.environ["BUCKET_NAME"]
 
-dynamodb = boto3.resource("dynamodb")
 # sigv4 required — sigv2 presigned urls fail with sts temporary credentials
 s3_client = boto3.client("s3", config=Config(signature_version="s3v4"))
-table = dynamodb.Table(TABLE_NAME)
 
 PRESIGN_EXPIRY = 300
 
@@ -40,21 +39,8 @@ def handle(event):
     s3_key = f"uploads/{invoice_id}"
     now = datetime.now(timezone.utc).isoformat()
 
-    item = {
-        "pk": f"INVOICE#{invoice_id}",
-        "sk": "METADATA",
-        "status": "pending",
-        "s3_key": s3_key,
-        "content_type": content_type,
-        "created_at": now,
-        "updated_at": now,
-    }
-
-    if vendor:
-        item["vendor"] = vendor
-
     try:
-        table.put_item(Item=item)
+        repo.create_invoice(invoice_id, s3_key, content_type, vendor, now)
     except Exception:
         return {
             "statusCode": 500,
@@ -68,8 +54,7 @@ def handle(event):
             ExpiresIn=PRESIGN_EXPIRY,
         )
     except Exception:
-        # clean up record if presign fails
-        table.delete_item(Key={"pk": f"INVOICE#{invoice_id}", "sk": "METADATA"})
+        repo.delete_invoice(invoice_id)
         return {
             "statusCode": 500,
             "body": json.dumps({"error": "failed to generate upload url"}),

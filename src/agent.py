@@ -6,8 +6,8 @@ from typing import List
 from agents import Agent, Runner, function_tool
 from openai import OpenAI
 
-import tools as invoice_tools
 from models import ClassifiedLineItemInput, ExtractedInvoice, SaveResult, TaxCategory
+from repository import repo
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
@@ -29,7 +29,7 @@ If a line item's quantity, unit_price, or subtotal could not be read, set those 
 @function_tool
 def get_tax_categories() -> List[TaxCategory]:
     """Fetch all available tax categories and their rates from the database."""
-    return invoice_tools.get_tax_categories()
+    return repo.get_tax_categories()
 
 
 def _extract(file_bytes: bytes, content_type: str) -> ExtractedInvoice:
@@ -75,7 +75,7 @@ def run(invoice_id: str, file_bytes: bytes, content_type: str) -> None:
     @function_tool
     def save_invoice_result(line_items: List[ClassifiedLineItemInput]) -> SaveResult:
         """Save the fully classified invoice result. Call once every line item is classified."""  # noqa: E501
-        return invoice_tools.save_invoice_result(
+        return repo.save_invoice_result(
             invoice_id=invoice_id,
             line_items=line_items,
         )

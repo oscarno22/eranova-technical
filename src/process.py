@@ -1,17 +1,14 @@
 import os
-from datetime import datetime, timezone
 
 import boto3
 
 import agent
+from repository import repo
 
-TABLE_NAME = os.environ["TABLE_NAME"]
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN")
 
-dynamodb = boto3.resource("dynamodb")
 s3_client = boto3.client("s3")
 sns_client = boto3.client("sns")
-table = dynamodb.Table(TABLE_NAME)
 
 
 def _notify(
@@ -45,13 +42,7 @@ def _notify(
 
 
 def _fail(invoice_id: str, error: str) -> None:
-    now = datetime.now(timezone.utc).isoformat()
-    table.update_item(
-        Key={"pk": f"INVOICE#{invoice_id}", "sk": "METADATA"},
-        UpdateExpression="SET #s = :s, #e = :e, updated_at = :t",
-        ExpressionAttributeNames={"#s": "status", "#e": "error"},
-        ExpressionAttributeValues={":s": "failed", ":e": error, ":t": now},
-    )
+    repo.set_failed(invoice_id, error)
     _notify(invoice_id, "failed", error=error)
 
 
@@ -68,9 +59,7 @@ def lambda_handler(event, context):
         try:
             resp = s3_client.get_object(Bucket=bucket, Key=key)
             file_bytes = resp["Body"].read()
-            meta = table.get_item(
-                Key={"pk": f"INVOICE#{invoice_id}", "sk": "METADATA"}
-            ).get("Item", {})
+            meta = repo.get_metadata(invoice_id) or {}
             content_type = meta.get("content_type") or resp.get(
                 "ContentType", "application/octet-stream"
             )
@@ -85,12 +74,8 @@ def lambda_handler(event, context):
             continue
 
         try:
-            meta = table.get_item(
-                Key={"pk": f"INVOICE#{invoice_id}", "sk": "METADATA"}
-            ).get("Item", {})
-            result = table.get_item(
-                Key={"pk": f"INVOICE#{invoice_id}", "sk": "RESULT"}
-            ).get("Item", {})
+            meta = repo.get_metadata(invoice_id) or {}
+            result = repo.get_result(invoice_id)
             _notify(
                 invoice_id,
                 meta.get("status", "complete"),

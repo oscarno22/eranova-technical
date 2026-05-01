@@ -1,23 +1,6 @@
 import json
-import os
-from decimal import Decimal
 
-import boto3
-
-TABLE_NAME = os.environ["TABLE_NAME"]
-
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(TABLE_NAME)
-
-
-def _floats(obj):
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, list):
-        return [_floats(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: _floats(v) for k, v in obj.items()}
-    return obj
+from repository import repo, to_float
 
 
 def handle(event):
@@ -25,10 +8,8 @@ def handle(event):
     if not invoice_id:
         return {"statusCode": 400, "body": json.dumps({"error": "missing invoice id"})}
 
-    pk = f"INVOICE#{invoice_id}"
-
     try:
-        meta = table.get_item(Key={"pk": pk, "sk": "METADATA"}).get("Item")
+        meta = repo.get_metadata(invoice_id)
     except Exception:
         return {
             "statusCode": 500,
@@ -59,7 +40,7 @@ def handle(event):
         }
 
     try:
-        result = table.get_item(Key={"pk": pk, "sk": "RESULT"}).get("Item", {})
+        result = repo.get_result(invoice_id)
     except Exception:
         return {
             "statusCode": 500,
@@ -69,10 +50,10 @@ def handle(event):
     body = {
         "invoice_id": invoice_id,
         "status": status,
-        "line_items": _floats(result.get("line_items", [])),
-        "subtotal": _floats(result.get("subtotal")),
-        "total_tax": _floats(result.get("total_tax")),
-        "total": _floats(result.get("total")),
+        "line_items": to_float(result.get("line_items", [])),
+        "subtotal": to_float(result.get("subtotal")),
+        "total_tax": to_float(result.get("total_tax")),
+        "total": to_float(result.get("total")),
     }
 
     if meta.get("vendor"):
