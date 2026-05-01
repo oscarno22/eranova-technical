@@ -7,9 +7,9 @@ from pydantic import BaseModel
 # extraction schema
 class LineItem(BaseModel):
     description: str
-    quantity: float
-    unit_price: float
-    subtotal: float
+    quantity: float | None = None
+    unit_price: float | None = None
+    subtotal: float | None = None
 
 
 class ExtractedInvoice(BaseModel):
@@ -28,6 +28,7 @@ class ClassifiedLineItem(LineItem):
     tax_category: str
     tax_rate: Decimal
     tax_amount: Decimal
+    excluded: bool = False
 
 
 class ClassifiedLineItemInput(LineItem):

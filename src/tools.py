@@ -37,29 +37,43 @@ def get_tax_categories() -> List[TaxCategory]:
     ]
 
 
+def _is_excluded(item: ClassifiedLineItemInput) -> bool:
+    return (
+        item.tax_category == "unclassified"
+        or item.quantity is None
+        or item.unit_price is None
+        or item.subtotal is None
+    )
+
+
 def save_invoice_result(
     invoice_id: str,
     line_items: List[ClassifiedLineItemInput],
-    subtotal: float,
-    total_tax: float,
-    total: float,
 ) -> SaveResult:
     pk = f"INVOICE#{invoice_id}"
     now = datetime.now(timezone.utc).isoformat()
+
+    items_with_flag = [
+        {**item.model_dump(), "excluded": _is_excluded(item)} for item in line_items
+    ]
+
+    valid = [item for item in line_items if not _is_excluded(item)]
+    subtotal = sum(item.subtotal for item in valid)
+    total_tax = sum(item.tax_amount for item in valid)
+    total = subtotal + total_tax
 
     table.put_item(
         Item={
             "pk": pk,
             "sk": "RESULT",
-            "line_items": _to_decimal([item.model_dump() for item in line_items]),
+            "line_items": _to_decimal(items_with_flag),
             "subtotal": Decimal(str(subtotal)),
             "total_tax": Decimal(str(total_tax)),
             "total": Decimal(str(total)),
         }
     )
 
-    has_unclassified = any(item.tax_category == "unclassified" for item in line_items)
-    status = "partial" if has_unclassified else "complete"
+    status = "partial" if len(valid) < len(line_items) else "complete"
 
     table.update_item(
         Key={"pk": pk, "sk": "METADATA"},

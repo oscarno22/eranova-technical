@@ -20,9 +20,10 @@ _CLASSIFY_SYSTEM = """
 You are a tax classification agent for RetailCo.
 Call get_tax_categories to see available categories, classify each line item,
 compute tax amounts (tax_amount = subtotal * tax_rate),
-then call save_invoice_result with the complete result.
+then call save_invoice_result with all line items.
 If a line item does not clearly fit any available category, use the 'unclassified' category.
-"""
+If a line item's quantity, unit_price, or subtotal could not be read, set those fields to null.
+"""  # noqa: E501
 
 
 @function_tool
@@ -72,19 +73,11 @@ def run(invoice_id: str, file_bytes: bytes, content_type: str) -> None:
     extracted = _extract(file_bytes, content_type)
 
     @function_tool
-    def save_invoice_result(
-        line_items: List[ClassifiedLineItemInput],
-        subtotal: float,
-        total_tax: float,
-        total: float,
-    ) -> SaveResult:
+    def save_invoice_result(line_items: List[ClassifiedLineItemInput]) -> SaveResult:
         """Save the fully classified invoice result. Call once every line item is classified."""  # noqa: E501
         return invoice_tools.save_invoice_result(
             invoice_id=invoice_id,
             line_items=line_items,
-            subtotal=subtotal,
-            total_tax=total_tax,
-            total=total,
         )
 
     agent = Agent(
