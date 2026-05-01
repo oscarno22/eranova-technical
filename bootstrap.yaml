@@ -113,7 +113,17 @@ Resources:
                   - s3:GetBucketTagging
                   - s3:GetBucketNotification
                   - s3:PutBucketNotification
+                  - s3:PutBucketPolicy
+                  - s3:GetBucketPolicy
+                  - s3:DeleteBucketPolicy
+                  - s3:ListBucket
                 Resource: !Sub arn:aws:s3:::eranova-technical-${AWS::AccountId}-*
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:GetObject
+                Resource: !Sub arn:aws:s3:::eranova-technical-${AWS::AccountId}-website/*
               - Effect: Allow
                 Action:
                   - iam:CreateRole
@@ -147,6 +157,19 @@ Resources:
                   - secretsmanager:DescribeSecret
                   - secretsmanager:TagResource
                 Resource: !Sub arn:aws:secretsmanager:*:${AWS::AccountId}:secret:eranova/*
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateDistribution
+                  - cloudfront:UpdateDistribution
+                  - cloudfront:GetDistribution
+                  - cloudfront:GetDistributionConfig
+                  - cloudfront:DeleteDistribution
+                  - cloudfront:TagResource
+                  - cloudfront:CreateOriginAccessControl
+                  - cloudfront:UpdateOriginAccessControl
+                  - cloudfront:GetOriginAccessControl
+                  - cloudfront:DeleteOriginAccessControl
+                Resource: '*'
 
 Outputs:
   ArtifactsBucketName:

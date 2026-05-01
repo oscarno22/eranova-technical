@@ -56,3 +56,11 @@ jobs:
         env:
           TABLE_NAME: eranova-technical
         run: uv run python scripts/seed_categories.py
+
+      - name: Sync website to S3
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name eranova-technical \
+            --query "Stacks[0].Outputs[?OutputKey=='WebsiteBucketName'].OutputValue" \
+            --output text)
+          aws s3 sync web/ s3://$BUCKET
