@@ -117,6 +117,8 @@ Resources:
                   - s3:PutBucketPolicy
                   - s3:GetBucketPolicy
                   - s3:DeleteBucketPolicy
+                  - s3:PutBucketCORS
+                  - s3:GetBucketCORS
                   - s3:ListBucket
                 Resource: !Sub arn:aws:s3:::eranova-technical-${AWS::AccountId}-*
               - Effect: Allow
