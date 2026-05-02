@@ -115,6 +115,7 @@ Resources:
           BUCKET_NAME: !Sub eranova-technical-${AWS::AccountId}-${AWS::Region}
           OPENAI_API_KEY: !Sub '{{resolve:secretsmanager:${OpenAIApiKeySecret}:SecretString:OPENAI_API_KEY}}'
           SNS_TOPIC_ARN: !Ref InvoiceTopic
+          API_BASE_URL: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
       Layers:
         - !Ref DependenciesLayer
 
@@ -159,6 +160,13 @@ Resources:
     Properties:
       ApiId: !Ref HttpApi
       RouteKey: GET /invoice/{id}
+      Target: !Sub integrations/${HttpApiIntegration}
+
+  GetInvoiceFileRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /invoice/{id}/file
       Target: !Sub integrations/${HttpApiIntegration}
 
   HttpApiStage:

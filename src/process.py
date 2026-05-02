@@ -6,6 +6,7 @@ import agent
 from repository import repo
 
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN")
+API_BASE_URL = os.environ.get("API_BASE_URL")
 
 s3_client = boto3.client("s3")
 sns_client = boto3.client("sns")
@@ -34,6 +35,9 @@ def _notify(
             lines.append(f"Total tax: ${float(result.get('total_tax', 0)):.2f}")
             lines.append(f"Total: ${float(result.get('total', 0)):.2f}")
         body = "\n".join(lines)
+
+    if API_BASE_URL:
+        body += f"\n\nDocument: {API_BASE_URL}/invoice/{invoice_id}/file"
 
     try:
         sns_client.publish(TopicArn=SNS_TOPIC_ARN, Subject=subject, Message=body)
