@@ -107,7 +107,7 @@ Resources:
       Handler: process.lambda_handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code: src/
-      Timeout: 120
+      Timeout: 300
       MemorySize: 256
       Environment:
         Variables:
