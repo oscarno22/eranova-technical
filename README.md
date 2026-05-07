@@ -165,3 +165,17 @@ Single table: `eranova-technical`. PK/SK design.
 | `INVOICE#inv_abc123` | `CORRECTIONS` | `corrections`, `corrected_at` |
 
 Tax categories are seeded from `data/tax_rate_by_category.csv` by `scripts/seed_categories.py`, which runs automatically as a post-deploy step.
+
+## Source Layout
+
+```
+src/
+├── handler.py      # ApiLambda entrypoint — dispatches API Gateway events to the right handler module by routeKey
+├── presign.py      # POST /invoice — validates the request, writes a pending record to DynamoDB, and returns a presigned S3 upload URL
+├── query.py        # GET /invoice/{id} — reads invoice status and result from DynamoDB and builds the response payload
+├── file.py         # GET /invoice/{id}/file — generates a fresh presigned S3 URL on each request and returns a 302 redirect to the original file
+├── process.py      # ProcessLambda entrypoint — reads the uploaded file from S3, drives the agent loop, and publishes the SNS outcome notification
+├── agent.py        # three-step agent loop: GPT extraction (vision/text → structured line items), Agents SDK classifier (tool-use loop → DynamoDB), and critic (validation + correction)
+├── repository.py   # all DynamoDB read/write operations; exports a repo singleton used across both Lambdas
+└── models.py       # Pydantic models for extraction output, classifier input/output, tax categories, and critic corrections
+```
